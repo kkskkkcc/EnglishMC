@@ -1,32 +1,27 @@
 package io.github.kkskkkcc.englishmc.client.speech;
 
-import com.google.gson.JsonParser;
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import com.sun.jna.NativeLibrary;
-import com.sun.jna.Pointer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.zip.ZipInputStream;
 
 public final class LocalRecognizer {
-    private static final String MODEL = "vosk-model-small-en-us-0.15";
-    private static final String ASSETS = "/assets/englishmc/speech/";
-    private static final int BLOCK_BYTES = 6400;
+    private static final String MODEL = "ggml-small.en-q5_1.bin";
+    private static final String BUNDLE = "/assets/englishmc/speech/whisper.zip";
+    private static final int TIMEOUT_SECONDS = 45;
+    private static final int FRAME_SAMPLES = Microphone.RATE / 50;
     private final Path cache;
-    private Vosk api;
-    private Pointer model;
+    private Process running;
 
     public LocalRecognizer(Path gameDirectory) {
-        this.cache = SpeechFiles.root(gameDirectory).resolve("speech-vosk-0.3.45");
+        this.cache = SpeechFiles.modelDirectory(gameDirectory, "whisper-small-en-v1.7.6");
     }
 
     public static boolean supported() {
@@ -35,92 +30,113 @@ public final class LocalRecognizer {
             && (arch.equals("amd64") || arch.equals("x86_64"));
     }
 
-    public synchronized void warmUp() throws IOException {
-        if (model != null) return;
-        if (!supported()) throw new IOException("EnglishMC speech needs 64-bit Windows on x86-64");
-        Path runtime = prepareAssets();
-        // Windows resolves dependent DLLs by module name when already loaded.
-        for (String name : dependencies()) {
-            NativeLibrary.getInstance(runtime.resolve(name).toString());
-        }
-        api = Native.load(runtime.resolve("libvosk.dll").toString(), Vosk.class,
-            Map.of(Library.OPTION_STRING_ENCODING, StandardCharsets.UTF_8.name()));
-        api.vosk_set_log_level(-1);
-        model = api.vosk_model_new(runtime.resolve(MODEL).toString());
-        if (model == null) throw new IOException("The EnglishMC speech model could not be loaded");
-    }
-
-    public synchronized String transcribe(byte[] pcm) throws IOException {
-        if (!hasSignal(pcm)) return "";
-        warmUp();
-        Pointer recognizer = api.vosk_recognizer_new(model, Microphone.RATE);
-        if (recognizer == null) throw new IOException("The EnglishMC recognizer could not be started");
-        try {
-            StringBuilder transcript = new StringBuilder();
-            for (int position = 0; position < pcm.length; position += BLOCK_BYTES) {
-                byte[] block = Arrays.copyOfRange(pcm, position, Math.min(position + BLOCK_BYTES, pcm.length));
-                int result = api.vosk_recognizer_accept_waveform(recognizer, block, block.length);
-                if (result < 0) throw new IOException("The EnglishMC recognizer rejected audio");
-                if (result > 0) appendText(transcript, api.vosk_recognizer_result(recognizer));
+    public void warmUp() throws IOException {
+        if (!supported()) throw new IOException("EnglishMC recognition needs 64-bit Windows on x86-64");
+        SpeechFiles.install(cache, staging -> {
+            var resource = LocalRecognizer.class.getResourceAsStream(BUNDLE);
+            if (resource == null) throw new IOException("Missing EnglishMC local recognition engine");
+            try (var zip = new ZipInputStream(resource)) {
+                SpeechFiles.unpack(zip, staging, staging);
             }
-            appendText(transcript, api.vosk_recognizer_final_result(recognizer));
-            return transcript.toString();
-        } finally {
-            api.vosk_recognizer_free(recognizer);
-        }
-    }
-
-    static boolean hasSignal(byte[] pcm) {
-        if (pcm.length < Microphone.RATE / 4 * 2) return false;
-        var samples = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
-        int activeSamples = 0;
-        while (samples.hasRemaining()) {
-            if (Math.abs((int) samples.get()) > 96 && ++activeSamples >= 160) return true;
-        }
-        return false;
-    }
-
-    private static void appendText(StringBuilder output, String json) {
-        String text = JsonParser.parseString(json).getAsJsonObject().get("text").getAsString().strip();
-        if (text.isEmpty()) return;
-        if (!output.isEmpty()) output.append(' ');
-        output.append(text);
-    }
-
-    private Path prepareAssets() throws IOException {
-        return SpeechFiles.install(cache, staging -> {
-            for (String dll : dependencies()) copyResource(staging, dll);
-            copyResource(staging, "libvosk.dll");
-            unpackModel(staging);
         });
     }
 
-    private static void copyResource(Path directory, String name) throws IOException {
-        try (var stream = LocalRecognizer.class.getResourceAsStream(ASSETS + name)) {
-            if (stream == null) throw new IOException("Missing EnglishMC speech resource " + name);
-            Files.copy(stream, directory.resolve(name));
+    public synchronized void cancel() {
+        if (running != null) running.destroyForcibly();
+    }
+
+    public String transcribe(byte[] pcm) throws IOException {
+        return transcribe(pcm, () -> false);
+    }
+
+    public String transcribe(byte[] pcm, BooleanSupplier cancelled) throws IOException {
+        byte[] audio = prepareAudio(pcm);
+        if (audio.length == 0 || cancelled.getAsBoolean()) return "";
+        warmUp();
+        Process process;
+        synchronized (this) {
+            if (cancelled.getAsBoolean()) return "";
+            int threads = Math.min(4, Runtime.getRuntime().availableProcessors());
+            // A named output base enables the transcript callback for stdin. It writes
+            // to stdout because no file output format is selected.
+            process = new ProcessBuilder(cache.resolve("whisper-cli.exe").toString(), "-m", MODEL,
+                "-f", "-", "-of", "englishmc", "-l", "en", "-nt", "-np", "-ng", "-t", Integer.toString(threads))
+                .directory(cache.toFile())
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+            running = process;
+        }
+        CompletableFuture.delayedExecutor(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .execute(() -> { if (process.isAlive()) process.destroyForcibly(); });
+        try {
+            try (var stdin = process.getOutputStream()) {
+                stdin.write(waveHeader(audio.length));
+                stdin.write(audio);
+            }
+            String heard = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (process.waitFor() != 0) throw new IOException("The local Whisper recognizer did not finish normally");
+            return heard.replaceAll("\\[[^\\]]*\\]|\\([^)]*\\)", " ").replaceAll("\\s+", " ").strip();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IOException("EnglishMC recognition was interrupted", error);
+        } catch (IOException error) {
+            if (cancelled.getAsBoolean()) return "";
+            throw error;
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+            synchronized (this) {
+                if (running == process) running = null;
+            }
         }
     }
 
-    private static void unpackModel(Path directory) throws IOException {
-        var stream = LocalRecognizer.class.getResourceAsStream(ASSETS + MODEL + ".zip");
-        if (stream == null) throw new IOException("Missing EnglishMC US English model");
-        try (var zip = new ZipInputStream(stream)) {
-            SpeechFiles.unpack(zip, directory, directory.resolve(MODEL));
+    static byte[] prepareAudio(byte[] pcm) {
+        int samples = pcm.length / 2;
+        if (samples < Microphone.RATE * 18 / 100) return new byte[0];
+        var source = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+        int frameCount = (samples + FRAME_SAMPLES - 1) / FRAME_SAMPLES;
+        double[] energies = new double[frameCount];
+        double peakRms = 0;
+        for (int frame = 0; frame < frameCount; frame++) {
+            int start = frame * FRAME_SAMPLES;
+            int end = Math.min(start + FRAME_SAMPLES, samples);
+            long squared = 0;
+            for (int i = start; i < end; i++) {
+                int sample = source.get(i);
+                squared += (long) sample * sample;
+            }
+            energies[frame] = Math.sqrt((double) squared / (end - start));
+            peakRms = Math.max(peakRms, energies[frame]);
         }
+        if (peakRms < 48) return new byte[0];
+
+        double threshold = Math.max(40, Math.min(280, peakRms * 0.12));
+        int first = 0;
+        int last = frameCount - 1;
+        while (energies[first] < threshold) first++;
+        while (energies[last] < threshold) last--;
+        if (last - first < 2) return new byte[0];
+
+        // Keep quiet consonants adjacent to speech, and lift low mic levels without clipping.
+        int padding = Microphone.RATE / 5;
+        int from = Math.max(0, first * FRAME_SAMPLES - padding);
+        int to = Math.min(samples, (last + 1) * FRAME_SAMPLES + padding);
+        double gain = Math.min(3.0, Math.max(1.0, 1000 / peakRms));
+        if (gain == 1.0) return Arrays.copyOfRange(pcm, from * 2, to * 2);
+        var output = ByteBuffer.allocate((to - from) * 2).order(ByteOrder.LITTLE_ENDIAN);
+        for (int i = from; i < to; i++) {
+            int scaled = (int) Math.round(source.get(i) * gain);
+            output.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, scaled)));
+        }
+        return output.array();
     }
 
-    private static List<String> dependencies() {
-        return List.of("libwinpthread-1.dll", "libgcc_s_seh-1.dll", "libstdc++-6.dll");
-    }
-
-    public interface Vosk extends Library {
-        void vosk_set_log_level(int level);
-        Pointer vosk_model_new(String directory);
-        Pointer vosk_recognizer_new(Pointer model, float sampleRate);
-        int vosk_recognizer_accept_waveform(Pointer recognizer, byte[] data, int length);
-        String vosk_recognizer_result(Pointer recognizer);
-        String vosk_recognizer_final_result(Pointer recognizer);
-        void vosk_recognizer_free(Pointer recognizer);
+    private static byte[] waveHeader(int dataSize) {
+        return ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+            .put("RIFF".getBytes(StandardCharsets.US_ASCII)).putInt(dataSize + 36)
+            .put("WAVEfmt ".getBytes(StandardCharsets.US_ASCII)).putInt(16)
+            .putShort((short) 1).putShort((short) 1).putInt(Microphone.RATE).putInt(Microphone.RATE * 2)
+            .putShort((short) 2).putShort((short) 16)
+            .put("data".getBytes(StandardCharsets.US_ASCII)).putInt(dataSize).array();
     }
 }

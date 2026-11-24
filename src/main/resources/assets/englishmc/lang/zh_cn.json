@@ -17,13 +17,13 @@
   "englishmc.status.checking": "正在本机识别…",
   "englishmc.status.matched": "已通过 · 和示范一致",
   "englishmc.status.personal": "已通过 · 回应了话题",
-  "englishmc.status.retry": "请跟读示范，或用自己的话更完整地回应  ·  %2$s 重试",
-  "englishmc.status.retry_words": "留意这些词  %1$s  ·  %2$s 重试",
+  "englishmc.status.retry": "这次没匹配到回答。可以重听示范后再试  ·  %2$s 重试",
+  "englishmc.status.retry_words": "这些词没听清：%1$s  ·  按 %2$s 再试",
   "englishmc.status.no_speech": "没有听清语音  ·  %2$s 重试",
   "englishmc.status.cancelled": "录音已中止  ·  %2$s 重试",
   "englishmc.status.mic_unavailable": "请检查 Windows 默认麦克风和访问权限  ·  %2$s 重试",
   "englishmc.status.recognition_failed": "本地语音识别失败  ·  %2$s 重试",
-  "englishmc.status.voice_failed": "离线神经语音播放失败，请检查声音输出后按 J 重播。",
+  "englishmc.status.voice_failed": "播报未能播放，请检查游戏的声音输出设备后重播。",
   "englishmc.status.unsupported": "麦克风识别和语音播报需要 64 位 Windows。",
   "key.categories.englishmc": "EnglishMC 英语口语",
   "key.englishmc.record": "开始或结束英语录音",
@@ -58,5 +58,7 @@
   "englishmc.roleplay.task.CET6.3": "重申商定的安排，再给出备用方案。",
   "englishmc.roleplay.task.IELTS_6_7.1": "用理由和具体信息展开回答。",
   "englishmc.roleplay.task.IELTS_6_7.2": "说明什么会改变你的回答，或你会怎样改用其他办法。",
-  "englishmc.roleplay.task.IELTS_6_7.3": "结束对话，并说明哪些情况会让你调整计划。"
+  "englishmc.roleplay.task.IELTS_6_7.3": "结束对话，并说明哪些情况会让你调整计划。",
+  "englishmc.status.voice_preparing": "正在合成语音…",
+  "englishmc.status.voice_muted": "播报已静音。请调高游戏的主音量和语音音量后重播。"
 }

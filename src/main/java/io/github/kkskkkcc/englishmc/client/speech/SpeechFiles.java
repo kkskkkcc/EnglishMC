@@ -11,9 +11,19 @@ import java.util.zip.ZipInputStream;
 final class SpeechFiles {
     private SpeechFiles() {}
 
-    static Path root(Path gameDirectory) {
+    static Path instanceCache(Path gameDirectory) {
+        return gameDirectory.toAbsolutePath().normalize().resolve("englishmc-cache");
+    }
+
+    static Path modelDirectory(Path gameDirectory, String name) {
+        Path instance = instanceCache(gameDirectory).resolve(name);
+        if (Files.isRegularFile(instance.resolve(".ready"))) return instance;
         String localAppData = System.getenv("LOCALAPPDATA");
-        return (localAppData == null ? gameDirectory : Path.of(localAppData)).resolve("EnglishMC");
+        if (localAppData != null) {
+            Path legacy = Path.of(localAppData).resolve("EnglishMC").resolve(name);
+            if (Files.isRegularFile(legacy.resolve(".ready"))) return legacy;
+        }
+        return instance;
     }
 
     static Path install(Path destination, Installer installer) throws IOException {

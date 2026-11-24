@@ -29,7 +29,9 @@ public final class ReplyCheck {
         Map.entry("isn't", "is not"), Map.entry("aren't", "are not"), Map.entry("wasn't", "was not"),
         Map.entry("weren't", "were not"), Map.entry("haven't", "have not"), Map.entry("hasn't", "has not"),
         Map.entry("shouldn't", "should not"), Map.entry("let's", "let us"),
-        Map.entry("gonna", "going to"), Map.entry("wanna", "want to"));
+        Map.entry("could've", "could have"), Map.entry("should've", "should have"),
+        Map.entry("would've", "would have"), Map.entry("y'all", "you all"),
+        Map.entry("gonna", "going to"), Map.entry("wanna", "want to"), Map.entry("gotta", "got to"));
     private static final Set<String> FILLERS = Set.of("uh", "um", "er", "hmm", "ah");
     private static final Set<String> DEVELOPMENT = Set.of("because", "since", "although", "though", "while",
         "when", "if", "unless", "so", "which", "but", "however", "therefore", "instead", "example",
@@ -49,7 +51,7 @@ public final class ReplyCheck {
         "put", "find", "found", "say", "said", "leave", "left", "bring", "brought", "read", "write",
         "walk", "walked", "run", "ran", "play", "watch", "choose", "keep", "help", "sleep", "drink", "cook");
     private static final Set<String> SHORT_REPLY_OPENERS = Set.of("at", "by", "in", "on", "near", "next",
-        "outside", "inside", "yes", "no", "sure", "one", "two", "three", "a", "some", "the");
+        "outside", "inside", "yes", "no", "sure", "1", "2", "3", "a", "some", "the");
     private static final Set<String> RESPONSE_OPENERS = Set.of("go", "take", "turn", "stay", "start", "put",
         "look", "head", "walk", "keep", "make", "try", "come", "read", "leave", "please", "thanks");
 
@@ -113,7 +115,7 @@ public final class ReplyCheck {
                 tokens.addAll(List.of(CONTRACTIONS.getOrDefault(token, token.replace("'", "")).split(" ")));
             }
         }
-        return tokens;
+        return SpeechEquivalent.normalizeNumbers(tokens);
     }
 
     private static Alignment align(List<String> expected, List<String> actual) {
@@ -122,7 +124,7 @@ public final class ReplyCheck {
         for (int j = 0; j < edits[0].length; j++) edits[0][j] = j;
         for (int i = 1; i < edits.length; i++) {
             for (int j = 1; j < edits[i].length; j++) {
-                int replacement = expected.get(i - 1).equals(actual.get(j - 1)) ? 0 : 1;
+                int replacement = SpeechEquivalent.matches(expected.get(i - 1), actual.get(j - 1)) ? 0 : 1;
                 edits[i][j] = Math.min(edits[i - 1][j - 1] + replacement,
                     1 + Math.min(edits[i - 1][j], edits[i][j - 1]));
             }
@@ -133,7 +135,7 @@ public final class ReplyCheck {
         int j = actual.size();
         int matched = 0;
         while (i > 0 || j > 0) {
-            if (i > 0 && j > 0 && expected.get(i - 1).equals(actual.get(j - 1))) {
+            if (i > 0 && j > 0 && SpeechEquivalent.matches(expected.get(i - 1), actual.get(j - 1))) {
                 i--;
                 j--;
                 matched++;

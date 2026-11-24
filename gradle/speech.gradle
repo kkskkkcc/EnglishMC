@@ -5,13 +5,13 @@ def voiceModel = 'kokoro-int8-multi-lang-v1_1'
 def apiJar = "sherpa-onnx-${sherpa}.jar"
 def nativeJar = "sherpa-onnx-native-lib-win-x64-${sherpa}.jar"
 def assets = [
-    'vosk-0.3.45.jar': [
-        url: 'https://repo.maven.apache.org/maven2/com/alphacephei/vosk/0.3.45/vosk-0.3.45.jar',
-        sha: '9e38e96e4448a41d889bb254b2f8424945554945c6e77e1cd97a3d8633fac2ba'
+    'whisper-bin-x64.zip': [
+        url: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.6/whisper-bin-x64.zip',
+        sha: '0d2eca299c248f965bd0341bcb219db4b433c7f0c0ce2200d4df85765e8156a9'
     ],
-    'vosk-model-small-en-us-0.15.zip': [
-        url: 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip',
-        sha: '30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498'
+    'ggml-small.en-q5_1.bin': [
+        url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/98aa99a0a9db05ae2342309f5096248665f7cba3/ggml-small.en-q5_1.bin',
+        sha: 'bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30'
     ],
     (apiJar): [
         url: "${source}/${sherpa}/${apiJar}",
@@ -27,7 +27,7 @@ def assets = [
     ]
 ]
 def inputsDir = layout.projectDirectory.dir('third_party')
-def speechResources = layout.buildDirectory.dir('generated/speech-resources')
+def speechResources = layout.buildDirectory.dir('generated/speech-resources-v2')
 def speechPath = 'assets/englishmc/speech'
 
 def sha256 = { File file ->
@@ -96,24 +96,20 @@ def nativeVoice = tasks.register('packageNeuralVoice', Zip) {
     preserveFileTimestamps = false
 }
 
-tasks.register('prepareSpeechResources') {
+def recognizer = tasks.register('packageLocalRecognizer', Zip) {
     dependsOn fetchSpeechInputs
-    inputs.files(inputsDir.file('vosk-0.3.45.jar'), inputsDir.file('vosk-model-small-en-us-0.15.zip'))
-    outputs.files(['libvosk.dll', 'libwinpthread-1.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll',
-        'vosk-model-small-en-us-0.15.zip'].collect { name -> speechResources.map { it.file("${speechPath}/${name}") } })
-    doLast {
-        def target = speechResources.get().dir(speechPath).asFile
-        copy {
-            from(zipTree(inputsDir.file('vosk-0.3.45.jar'))) {
-                include 'win32-x86-64/*.dll'
-                eachFile { path = name }
-                includeEmptyDirs = false
-            }
-            from inputsDir.file('vosk-model-small-en-us-0.15.zip')
-            into target
-        }
+    from({ zipTree(inputsDir.file('whisper-bin-x64.zip')) }) {
+        include 'Release/whisper-cli.exe', 'Release/whisper.dll', 'Release/ggml.dll',
+            'Release/ggml-base.dll', 'Release/ggml-cpu.dll'
+        eachFile { path = name }
+        includeEmptyDirs = false
     }
+    from inputsDir.file('ggml-small.en-q5_1.bin')
+    destinationDirectory = speechResources.map { it.dir(speechPath) }
+    archiveFileName = 'whisper.zip'
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
 }
 
 sourceSets.main.resources.srcDir speechResources
-tasks.named('processResources').configure { dependsOn 'prepareSpeechResources', nativeVoice }
+tasks.named('processResources').configure { dependsOn recognizer, nativeVoice }

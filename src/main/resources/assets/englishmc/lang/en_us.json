@@ -17,13 +17,13 @@
   "englishmc.status.checking": "Recognizing locally…",
   "englishmc.status.matched": "Matched the example",
   "englishmc.status.personal": "On-topic response accepted",
-  "englishmc.status.retry": "Try the example or give a fuller on-topic reply  ·  %2$s Retry",
-  "englishmc.status.retry_words": "Practice these words  %1$s  ·  %2$s Retry",
+  "englishmc.status.retry": "I could not match that reply. Replay the example and try again  ·  %2$s Retry",
+  "englishmc.status.retry_words": "I did not catch these words  %1$s  ·  %2$s Retry",
   "englishmc.status.no_speech": "No clear speech heard  ·  %2$s Retry",
   "englishmc.status.cancelled": "Recording interrupted  ·  %2$s Retry",
   "englishmc.status.mic_unavailable": "Check your default Windows microphone and privacy permission  ·  %2$s Retry",
   "englishmc.status.recognition_failed": "Local recognition failed  ·  %2$s Retry",
-  "englishmc.status.voice_failed": "Offline neural voice failed. Check audio output, then replay the prompt.",
+  "englishmc.status.voice_failed": "Speech could not play. Check the game audio output, then replay.",
   "englishmc.status.unsupported": "Microphone and speech playback require 64-bit Windows.",
   "key.categories.englishmc": "EnglishMC Speaking",
   "key.englishmc.record": "Start or finish English reply",
@@ -58,5 +58,7 @@
   "englishmc.roleplay.task.CET6.3": "State the agreement, then give a fallback.",
   "englishmc.roleplay.task.IELTS_6_7.1": "Develop your reply with a reason and a specific detail.",
   "englishmc.roleplay.task.IELTS_6_7.2": "Explain what would change your answer or what you would do instead.",
-  "englishmc.roleplay.task.IELTS_6_7.3": "Close the exchange and explain when your plan might change."
+  "englishmc.roleplay.task.IELTS_6_7.3": "Close the exchange and explain when your plan might change.",
+  "englishmc.status.voice_preparing": "Preparing speech…",
+  "englishmc.status.voice_muted": "Speech is muted. Raise the Master and Voice sliders, then replay."
 }

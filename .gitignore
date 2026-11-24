@@ -6,3 +6,5 @@
 /third_party/
 *.iml
 hs_err_pid*.log
+
+/englishmc-cache/

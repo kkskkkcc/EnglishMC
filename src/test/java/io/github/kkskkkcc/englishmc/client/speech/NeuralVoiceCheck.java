@@ -16,15 +16,18 @@ import javax.sound.sampled.AudioSystem;
 
 public final class NeuralVoiceCheck {
     public static void main(String[] args) throws Exception {
-        var voice = new LocalVoice(Path.of("."));
-        var process = LocalVoice.startWorker(voice.prepare());
+        byte[] longResample = Microphone.resample(new byte[48000 * 2 * 10], 48000);
+        if (longResample.length != Microphone.RATE * 2 * 10 || LocalRecognizer.prepareAudio(longResample).length != 0) {
+            throw new IOException("Long 48 kHz capture or silence handling failed");
+        }
+        var process = LocalVoice.startWorker(LocalVoice.prepare(Path.of(".")), Path.of("."));
         Path output = Path.of(args[0]);
         Files.createDirectories(output.getParent());
         try {
             var narration = new LocalVoice.Narration(List.of(
                 new Bilingual("Where are you right now?", "你现在在哪里？"),
                 new Bilingual("I'm at the front entrance of the library.", "我在图书馆正门口。")
-            ), -1, 100);
+            ), -1);
             LocalVoice.send(process, narration);
             try (var input = new DataInputStream(process.getInputStream())) {
                 int rate = input.readInt();
@@ -39,10 +42,11 @@ public final class NeuralVoiceCheck {
                     if (segment == 2) {
                         var recognizer = new LocalRecognizer(Path.of("."));
                         String heard = recognizer.transcribe(Microphone.resample(pcm, rate));
-                        if (!heard.contains("front entrance") || !heard.contains("library")) {
+                        String folded = heard.toLowerCase(java.util.Locale.ROOT);
+                        if (!folded.contains("front entrance") || !folded.contains("library")) {
                             throw new IOException("Could not confirm spoken English example: " + heard);
                         }
-                        System.out.println("Kokoro English example recognized by Vosk: " + heard);
+                        System.out.println("Kokoro English example recognized by Whisper: " + heard);
                     }
                     preview.write(pcm);
                     preview.write(new byte[rate / 3]);

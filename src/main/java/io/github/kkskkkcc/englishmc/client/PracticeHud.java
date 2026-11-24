@@ -1,5 +1,6 @@
 package io.github.kkskkkcc.englishmc.client;
 
+import io.github.kkskkkcc.englishmc.client.speech.LocalVoice;
 import io.github.kkskkkcc.englishmc.mixin.GuiTooltipAccessor;
 import java.util.ArrayList;
 import java.util.List;
@@ -141,7 +142,8 @@ final class PracticeHud {
         int statusColor = view.alert() ? 0xffffb8a7 : view.passed() ? 0xffadf0b9 : 0xffc0d7f1;
         add(output, font, width, view.status(), statusColor, 3);
         if (view.voiceError() != null) {
-            add(output, font, width, Component.translatable(view.voiceError()), 0xffffb8a7, 2);
+            int voiceColor = LocalVoice.PREPARING.equals(view.voiceError()) ? 0xffc0d7f1 : 0xffffb8a7;
+            add(output, font, width, Component.translatable(view.voiceError()), voiceColor, 2);
         }
         return List.copyOf(output);
     }

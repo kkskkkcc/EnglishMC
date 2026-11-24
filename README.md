@@ -4,7 +4,7 @@
 
 ## 安装与使用
 
-1. 将 `englishmc-forge-1.20.1-1.2.0.jar` 放进 Forge 实例的 `mods` 文件夹。升级时移出旧版 EnglishMC JAR。
+1. 将 `englishmc-forge-1.20.1-1.2.1.jar` 放进 Forge 实例的 `mods` 文件夹。升级时移出旧版 EnglishMC JAR。
 2. 在「单人游戏 → 创建世界 → 英语口语」打开开关，点击难度按钮切换 **A1、A2、B1、B2、大学英语四级、大学英语六级、雅思 6–7**。默认间隔 5 分钟，可选 1–60 分钟。开关、难度和间隔随存档保存。旧版 B1、B2 和雅思设置会继承到对应档位。
 3. 进入世界后等待第一题，或者按 **V** 提前出题。教练先读一句美式英语，再播报对应中文。题目和示范回答按这个顺序播放。
 4. 按 **V** 录音，等字幕显示「录音中」后开口。再按 **V** 提交，也可等自动提交。**J** 重播。按键可在「选项 → 控制」中修改。
@@ -28,13 +28,13 @@
 | 大学英语六级 | 比较方案、展开例子并讨论条件和限制 |
 | 雅思 6–7 | 展开观点、举例、叙述经历和解释取舍 |
 
-可以跟读示范，也可以用自己的话作答。跟读按识别结果对齐词语，偏离示范时提示可能需要重练的词。自由回答按语境、基本句式和档位所需的信息量检查。口音、背景声或题库未覆盖的表达可能影响识别与判定。反馈用于练习，无法进行音素级发音检测或评定正式考试分数。
+可以跟读示范，也可以用自己的话作答。跟读按识别结果对齐词语，常见数字写法、缩写和同音词按同样的读法核对。出现差异时会指出没听清的词。自由回答按语境、基本句式和档位所需的信息量检查。口音、背景声或题库未覆盖的表达可能影响识别与判定。反馈用于练习，无法进行音素级发音检测或评定正式考试分数。
 
 内容设计参考 [欧洲委员会 CEFR 描述](https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors-search)、[中国教育考试网 CET 口试任务](https://cet.neea.edu.cn/html1/folder/16113/1587-1.htm) 和 [IELTS 口语评分描述](https://ielts.org/cdn/ielts-guides/ielts-speaking-band-descriptors.pdf)。
 
 ## 语音与隐私
 
-播报使用随模组打包的 **Kokoro 82M v1.1** 模型，通过本机 CPU 合成美式英语和普通话。A1、A2 默认放慢英文语速。播报音量由游戏的主音量和语音音量共同控制。首次使用时，模组会把模型解压到当前用户的 Windows 本地应用数据目录。安装后，双语播报和 Vosk 英文识别均可离线运行。
+播报使用随模组打包的 **Kokoro 82M v1.1** 模型，通过本机 CPU 合成美式英语和普通话。A1、A2 默认放慢英文语速。播报使用 Minecraft 选中的声音输出设备，音量由游戏的主音量和语音音量共同控制。首次使用时，模组会把模型解压到当前游戏实例的 englishmc-cache 目录。已解压的旧版 Kokoro 模型可直接复用。安装后，双语播报和 Whisper small.en 英文识别均可离线运行。
 
 麦克风仅在按键开始录音时使用。录音和回话文本在内存处理，不上传、不写入存档，也不发到聊天频道。无法录音时，在 Windows 声音设置确认默认输入设备，并检查桌面应用的麦克风访问权限。
 
@@ -44,6 +44,6 @@
 .\gradlew.bat build
 ```
 
-首次构建从 Forge、Maven Central、Vosk 和 GitHub 获取依赖。语音构建输入使用固定版本和 SHA-256 校验。完整 JAR 在 `build/libs/`，大小约 200 MiB。题库位于 `src/main/resources/assets/englishmc/lessons/scenes.txt`，短题每个场景需要七档条目。角色扮演内容在 src/main/resources/assets/englishmc/roleplays/，采用独立情境和有序回合。
+首次构建从 Forge、Maven Central、Hugging Face 和 GitHub 获取依赖。语音构建输入使用固定版本和 SHA-256 校验。完整 JAR 在 `build/libs/`，包含离线播报和识别所需模型。题库位于 `src/main/resources/assets/englishmc/lessons/scenes.txt`，短题每个场景需要七档条目。角色扮演内容在 src/main/resources/assets/englishmc/roleplays/，采用独立情境和有序回合。
 
 `verifyPractice` 检查 90 类覆盖、角色与回合顺序、七档示例、无重复抽题和反馈判定。也可用 `verifyPractice -PspeechSample=绝对路径` 对 16 kHz、16 位单声道 WAV 运行本地识别。`verifyNeuralVoice` 在 Windows 实测双语合成，并在 `build/validation/` 生成试听。第三方来源见 [第三方组件](THIRD_PARTY_NOTICES.md)。

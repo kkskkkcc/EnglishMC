@@ -68,6 +68,12 @@ public final class PracticeChecks {
             "Incorrect vocabulary passed");
         System.out.println("EnglishMC verified all " + SCENE_COUNT * values.length + " lessons and reply checks");
 
+        require(ReplyCheck.words("I'll be there at five thirty").equals(ReplyCheck.words("I will be there at 5:30.")),
+            "Digits and contractions should match the same spoken time");
+        require(ReplyCheck.words("It's four two nine").equals(ReplyCheck.words("It's 429.")),
+            "A spoken reference number should match its formatted form");
+        require(SpeechEquivalent.matches("hear", "here") && SpeechEquivalent.matches("2", "too")
+            && !SpeechEquivalent.matches("coffee", "tea"), "Homophone matching must stay narrow");
         RoleplayChecks.verify();
 
         if (args.length > 0) {
@@ -77,8 +83,8 @@ public final class PracticeChecks {
                 require(format.getSampleRate() == 16000f && format.getChannels() == 1
                     && format.getSampleSizeInBits() == 16 && !format.isBigEndian(), "Expected 16 kHz mono PCM");
                 String heard = recognizer.transcribe(sample.readAllBytes());
-                require(!heard.isBlank(), "Vosk returned no words from the sample");
-                if (args.length > 1) require(heard.contains(args[1]), "Sample did not contain expected words: " + heard);
+                require(!heard.isBlank(), "Whisper returned no words from the sample");
+                if (args.length > 1) require(heard.toLowerCase(java.util.Locale.ROOT).contains(args[1]), "Sample did not contain expected words: " + heard);
                 System.out.println("EnglishMC recognized sample: " + heard);
             }
         }

@@ -22,6 +22,8 @@ public final class Microphone {
         finishing = true;
     }
 
+    public boolean isCancelled() { return cancelled; }
+
     public byte[] record(int seconds, Runnable opened) throws LineUnavailableException, InterruptedException {
         if (finishing) return new byte[0];
         try (TargetDataLine line = open()) {
@@ -44,7 +46,11 @@ public final class Microphone {
                     Thread.sleep(12);
                 }
             }
-            return cancelled ? new byte[0] : resample(toMono(audio.toByteArray(), frameSize), sourceRate);
+            if (cancelled) return new byte[0];
+            int buffered = Math.min(Math.min(line.available(), buffer.length), byteLimit - audio.size());
+            buffered -= buffered % frameSize;
+            if (buffered > 0) audio.write(buffer, 0, line.read(buffer, 0, buffered));
+            return resample(toMono(audio.toByteArray(), frameSize), sourceRate);
         }
     }
 
@@ -88,8 +94,8 @@ public final class Microphone {
         int samples = pcm.length / 2;
         byte[] output = new byte[(int) ((long) samples * RATE / sourceRate) * 2];
         for (int i = 0; i < output.length / 2; i++) {
-            int from = i * sourceRate / RATE;
-            int to = (i + 1) * sourceRate / RATE;
+            int from = (int) ((long) i * sourceRate / RATE);
+            int to = (int) ((long) (i + 1) * sourceRate / RATE);
             int sum = 0;
             for (int j = from; j < to; j++) {
                 sum += (short) ((pcm[j * 2] & 0xff) | (pcm[j * 2 + 1] << 8));

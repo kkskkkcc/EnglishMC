@@ -18,7 +18,6 @@ import javax.sound.sampled.LineUnavailableException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundSource;
 
 final class PracticeSession {
     private enum Phase { IDLE, WAITING, PREPARING, RECORDING, CHECKING, PASSED }
@@ -62,7 +61,7 @@ final class PracticeSession {
     PracticeSession(Minecraft minecraft) {
         this.minecraft = minecraft;
         recognizer = new LocalRecognizer(minecraft.gameDirectory.toPath());
-        voice = new LocalVoice(minecraft.gameDirectory.toPath());
+        voice = new LocalVoice(minecraft);
     }
 
     void tick(boolean recordPressed, boolean replayPressed) {
@@ -157,7 +156,7 @@ final class PracticeSession {
                 minecraft.execute(() -> {
                     if (microphone == capture) phase = Phase.CHECKING;
                 });
-                String heard = recognizer.transcribe(audio);
+                String heard = recognizer.transcribe(audio, capture::isCancelled);
                 minecraft.execute(() -> {
                     if (microphone == capture) submit(heard);
                 });
@@ -216,10 +215,8 @@ final class PracticeSession {
         if (unavailable) return;
         voiceError = null;
         int version = turnVersion;
-        int volume = Math.round(100 * minecraft.options.getSoundSourceVolume(SoundSource.MASTER)
-            * minecraft.options.getSoundSourceVolume(SoundSource.VOICE));
         var narration = new LocalVoice.Narration(lines.stream().flatMap(line -> line.sentences().stream()).toList(),
-            difficulty.narrationRate(), volume);
+            difficulty.narrationRate());
         voice.speak(narration, key -> minecraft.execute(() -> {
             if (turnVersion == version) voiceError = key;
         }));
@@ -228,6 +225,7 @@ final class PracticeSession {
     private void cancelRecord() {
         if (microphone != null) {
             microphone.cancel();
+            recognizer.cancel();
             microphone = null;
         }
     }
