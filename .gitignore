@@ -1,0 +1,9 @@
+/.gradle/
+/.idea/
+/build/
+/run/
+/out/
+/third_party/*.zip
+/third_party/*.jar
+*.iml
+hs_err_pid*.log

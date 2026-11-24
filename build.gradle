@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'
+}
+
+group = 'io.github.kkskkkcc'
+version = '1.0.0'
+base.archivesName = 'englishmc-forge-1.20.1'
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+    maven { url = 'https://maven.minecraftforge.net/' }
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+}
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        client {
+            workingDirectory project.file('run')
+            args '--width', '1280', '--height', '800'
+            property 'forge.logging.console.level', 'info'
+            mods {
+                englishmc { source sourceSets.main }
+            }
+        }
+    }
+}
+
+mixin {
+    add sourceSets.main, 'englishmc.refmap.json'
+    config 'englishmc.mixins.json'
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+jar {
+    manifest.attributes('MixinConfigs': 'englishmc.mixins.json')
+    finalizedBy 'reobfJar'
+}
+
+apply from: 'gradle/speech.gradle'
+
+tasks.register('verifyPractice', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.kkskkkcc.englishmc.PracticeChecks'
+    if (project.hasProperty('speechSample')) args project.property('speechSample')
+    if (project.hasProperty('speechExpected')) args project.property('speechExpected')
+}
+tasks.named('check').configure { dependsOn 'verifyPractice' }
+
+tasks.named('processResources').configure {
+    from('THIRD_PARTY_NOTICES.md') { into 'META-INF' }
+}

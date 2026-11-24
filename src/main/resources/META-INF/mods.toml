@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[47,48)"
+license="All Rights Reserved for original code and content; see third-party notices"
+
+[[mods]]
+modId="englishmc"
+version="1.0.0"
+displayName="EnglishMC 英语口语"
+displayTest="IGNORE_ALL_VERSION"
+description='''Bilingual, offline English speaking practice for single-player worlds.'''
+
+[[dependencies.englishmc]]
+modId="forge"
+mandatory=true
+versionRange="[47.4.20,48)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.englishmc]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"

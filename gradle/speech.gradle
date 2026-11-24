@@ -1,0 +1,67 @@
+// Build inputs are pinned by checksum. The runtime never downloads speech assets.
+def voskArtifacts = [
+    'vosk-0.3.45.jar': [
+        url: 'https://repo.maven.apache.org/maven2/com/alphacephei/vosk/0.3.45/vosk-0.3.45.jar',
+        sha: '9e38e96e4448a41d889bb254b2f8424945554945c6e77e1cd97a3d8633fac2ba'
+    ],
+    'vosk-model-small-en-us-0.15.zip': [
+        url: 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip',
+        sha: '30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498'
+    ]
+]
+def dependenciesDir = layout.projectDirectory.dir('third_party')
+def speechResources = layout.buildDirectory.dir('generated/speech-resources')
+def sha256 = { File file ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        new java.security.DigestOutputStream(OutputStream.nullOutputStream(), digest).withCloseable { output ->
+            input.transferTo(output)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+tasks.register('prepareSpeechResources') {
+    inputs.property('assets', voskArtifacts)
+    outputs.dir(speechResources)
+    doLast {
+        File dependencyFolder = dependenciesDir.asFile
+        dependencyFolder.mkdirs()
+        voskArtifacts.each { name, asset ->
+            File destination = new File(dependencyFolder, name)
+            if (!destination.isFile()) {
+                if (gradle.startParameter.offline) {
+                    throw new GradleException("Missing ${destination}. Build once online or supply the pinned input.")
+                }
+                File download = File.createTempFile('englishmc-', '.part', dependencyFolder)
+                try {
+                    def connection = URI.create(asset.url).toURL().openConnection()
+                    connection.connectTimeout = 20000
+                    connection.readTimeout = 60000
+                    connection.inputStream.withCloseable { input ->
+                        download.withOutputStream { output -> input.transferTo(output) }
+                    }
+                    if (sha256(download) != asset.sha) throw new GradleException("Checksum mismatch for ${name}")
+                    java.nio.file.Files.move(download.toPath(), destination.toPath())
+                } finally {
+                    download.delete()
+                }
+            }
+            if (sha256(destination) != asset.sha) throw new GradleException("Checksum mismatch for ${destination}")
+        }
+
+        def target = speechResources.get().dir('assets/englishmc/speech').asFile
+        copy {
+            from(zipTree(dependenciesDir.file('vosk-0.3.45.jar'))) {
+                include 'win32-x86-64/*.dll'
+                eachFile { path = name }
+                includeEmptyDirs = false
+            }
+            from dependenciesDir.file('vosk-model-small-en-us-0.15.zip')
+            into target
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir speechResources
+tasks.named('processResources').configure { dependsOn 'prepareSpeechResources' }
