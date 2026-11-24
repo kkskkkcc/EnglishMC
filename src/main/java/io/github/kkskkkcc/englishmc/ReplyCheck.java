@@ -1,5 +1,6 @@
 package io.github.kkskkkcc.englishmc;
 
+import io.github.kkskkkcc.englishmc.LessonDeck.Bilingual;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -66,6 +67,7 @@ public final class ReplyCheck {
         if (alignment.edits == 0) return new Result(Outcome.MATCHED, "");
 
         if (vocabulary) return new Result(Outcome.RETRY, alignment.focus);
+        if (matchesExampleSentences(card.example(), actual)) return new Result(Outcome.MATCHED, "");
         boolean closeToExample = alignment.matched >= Math.max(3, (expected.size() * 3 + 3) / 4);
 
         int minimumWords = level.minimumWords();
@@ -84,6 +86,32 @@ public final class ReplyCheck {
             return new Result(Outcome.PERSONAL_ANSWER, "");
         }
         return new Result(Outcome.RETRY, closeToExample ? alignment.focus : "");
+    }
+
+    private static boolean matchesExampleSentences(Bilingual example, List<String> actual) {
+        List<Bilingual> sentences = example.sentences();
+        if (sentences.size() < 2) return false;
+
+        // Use the same complete sentences shown as suggestions in the HUD.
+        List<List<String>> choices = sentences.stream().map(sentence -> words(sentence.english())).toList();
+        for (int start = 0; start < choices.size(); start++) {
+            int offset = 0;
+            for (int part = start; part < choices.size(); part++) {
+                List<String> sentence = choices.get(part);
+                if (!matchesAt(sentence, actual, offset)) break;
+                offset += sentence.size();
+                if (offset == actual.size()) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesAt(List<String> expected, List<String> actual, int offset) {
+        if (expected.size() > actual.size() - offset) return false;
+        for (int i = 0; i < expected.size(); i++) {
+            if (!SpeechEquivalent.matches(expected.get(i), actual.get(offset + i))) return false;
+        }
+        return true;
     }
 
     private static boolean hasResponseStructure(PracticeLevel level, List<String> actual) {

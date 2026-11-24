@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.github.kkskkkcc'
-version = '1.2.1'
+version = '1.2.2'
 base.archivesName = 'englishmc-forge-1.20.1'
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 

@@ -16,6 +16,7 @@ final class RoleplayChecks {
     private RoleplayChecks() {}
 
     static void verify() {
+        verifySchoolReply();
         Set<Integer> topics = IntStream.range(0, COVERED_TOPICS).boxed().collect(Collectors.toSet());
         Map<String, List<Card>> previousLevel = null;
         int totalTurns = 0;
@@ -47,6 +48,16 @@ final class RoleplayChecks {
                         "Role or conclusion changed halfway: " + card.id());
                     require(ReplyCheck.check(level, card, false, card.example().english()).passed(),
                         "Demonstration was rejected: " + card.id());
+                    var sentences = card.example().sentences();
+                    for (var sentence : sentences) {
+                        require(ReplyCheck.check(level, card, false, sentence.english()).outcome() == ReplyCheck.Outcome.MATCHED,
+                            "A complete demonstration sentence was rejected: " + level + "/" + card.id());
+                    }
+                    if (sentences.size() > 2) {
+                        String adjacent = sentences.get(1).english() + " " + sentences.get(2).english();
+                        require(ReplyCheck.check(level, card, false, adjacent).outcome() == ReplyCheck.Outcome.MATCHED,
+                            "Adjacent demonstration sentences were rejected: " + level + "/" + card.id());
+                    }
                     require(!ReplyCheck.check(level, card, false, "").passed(), "Silence was accepted: " + card.id());
                     require(ReplyCheck.check(level, card, true, card.vocabulary().english()).passed(),
                         "Vocabulary example was rejected: " + card.id());
@@ -74,6 +85,23 @@ final class RoleplayChecks {
         require(shortenedPrompts > 50 && totalTurns == 2100, "Incomplete leveled bank");
         System.out.println("EnglishMC roleplays verified: 90 topics, 100 scenarios, 68 slang notes, " + totalTurns
             + " leveled turns");
+    }
+
+    private static void verifySchoolReply() {
+        var deck = new RoleplayDeck(PracticeLevel.B1);
+        for (int i = 0; i < EPISODES; i++) {
+            Card card = deck.draw().get(2);
+            if (!card.id().equals("09-school.3")) continue;
+
+            require(ReplyCheck.check(PracticeLevel.B1, card, false, "Is it on the school website?")
+                .outcome() == ReplyCheck.Outcome.MATCHED, "The school registration reply from the screenshot was rejected");
+            require(!ReplyCheck.check(PracticeLevel.B1, card, false, "Is it on the school").passed(),
+                "A cut-off school registration reply was accepted");
+            require(!ReplyCheck.check(PracticeLevel.B1, card, false, card.prompt().english()).passed(),
+                "Repeating the school registration prompt counted as a reply");
+            return;
+        }
+        throw new AssertionError("School registration regression scene is missing");
     }
 
     private static void require(boolean condition, String message) {
