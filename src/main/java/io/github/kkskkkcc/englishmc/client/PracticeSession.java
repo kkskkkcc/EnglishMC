@@ -6,6 +6,7 @@ import io.github.kkskkkcc.englishmc.LessonDeck.Bilingual;
 import io.github.kkskkkcc.englishmc.LessonDeck.Card;
 import io.github.kkskkkcc.englishmc.PracticeLevel;
 import io.github.kkskkkcc.englishmc.ReplyCheck;
+import io.github.kkskkkcc.englishmc.RoleplayDeck;
 import io.github.kkskkkcc.englishmc.WorldPractice;
 import io.github.kkskkkcc.englishmc.client.speech.LocalRecognizer;
 import io.github.kkskkkcc.englishmc.client.speech.LocalVoice;
@@ -41,9 +42,11 @@ final class PracticeSession {
     private IntegratedServer world;
     private PracticeLevel difficulty;
     private LessonDeck deck;
+    private RoleplayDeck roleplays;
+    private List<Card> roleplayTurns = List.of();
+    private int openedScenes;
     private Card card;
     private boolean vocabulary;
-    private boolean followUp;
     private Phase phase = Phase.IDLE;
     private Next next = Next.SCENE;
     private int delay;
@@ -79,6 +82,7 @@ final class PracticeSession {
             world = current;
             difficulty = selected;
             deck = new LessonDeck(selected);
+            roleplays = new RoleplayDeck(selected);
             delay = 7 * TICKS_PER_SECOND;
             unavailable = !LocalRecognizer.supported();
             if (!unavailable) {
@@ -105,7 +109,7 @@ final class PracticeSession {
         }
         if (phase == Phase.WAITING) {
             if (recordPressed) capture();
-            else if (replayPressed) narrate(List.of(prompt(), example()));
+            else if (replayPressed) narrate(currentLines());
         } else if (phase == Phase.RECORDING && recordPressed) {
             microphone.finish();
             phase = Phase.CHECKING;
@@ -113,18 +117,27 @@ final class PracticeSession {
     }
 
     private void showNext() {
-        Card related = next == Next.FOLLOW_UP ? deck.followUp(card) : null;
         vocabulary = next == Next.VOCABULARY;
-        if (!vocabulary) {
-            followUp = related != null;
-            card = followUp ? related : deck.draw();
+        if (next == Next.FOLLOW_UP) {
+            card = roleplayTurns.get(card.roleplay().turn());
+        } else if (!vocabulary) {
+            // Retain the short existing lessons as occasional warm-ups between full scenes.
+            roleplayTurns = ++openedScenes % 5 == 0 ? List.of() : roleplays.draw();
+            card = roleplayTurns.isEmpty() ? deck.draw() : roleplayTurns.get(0);
         }
         phase = Phase.WAITING;
         turnVersion++;
         transcript = "";
         focusWords = "";
         feedback = null;
-        narrate(List.of(prompt(), example()));
+        narrate(currentLines());
+    }
+
+    private List<Bilingual> currentLines() {
+        var context = card.roleplay();
+        return !vocabulary && context != null && context.turn() == 1
+            ? List.of(context.situation(), prompt(), example())
+            : List.of(prompt(), example());
     }
 
     private void capture() {
@@ -182,12 +195,16 @@ final class PracticeSession {
 
         phase = Phase.PASSED;
         feedback = result.outcome() == ReplyCheck.Outcome.MATCHED ? "matched" : "personal";
-        narrate(List.of(result.outcome() == ReplyCheck.Outcome.MATCHED ? MODEL_MATCHED : PERSONAL_MATCHED));
-        if (!vocabulary) successfulDialogues++;
-        if (!vocabulary && successfulDialogues % 4 == 0) {
-            next = Next.VOCABULARY;
-        } else if (!vocabulary && !followUp) {
+        var context = card.roleplay();
+        if (!vocabulary && context != null && context.turn() == context.total()) {
+            narrate(List.of(context.closing()));
+        } else {
+            narrate(List.of(result.outcome() == ReplyCheck.Outcome.MATCHED ? MODEL_MATCHED : PERSONAL_MATCHED));
+        }
+        if (!vocabulary && context != null && context.turn() < context.total()) {
             next = Next.FOLLOW_UP;
+        } else if (!vocabulary && ++successfulDialogues % 4 == 0) {
+            next = Next.VOCABULARY;
         } else {
             next = Next.SCENE;
         }
@@ -222,6 +239,9 @@ final class PracticeSession {
         world = null;
         difficulty = null;
         deck = null;
+        roleplays = null;
+        roleplayTurns = List.of();
+        openedScenes = 0;
         card = null;
         phase = Phase.IDLE;
         next = Next.SCENE;
@@ -245,7 +265,7 @@ final class PracticeSession {
                 ClientHooks.REPLAY.getTranslatedKeyMessage());
         };
         boolean alert = phase == Phase.RECORDING || (feedback != null && phase != Phase.PASSED);
-        return new View(card.scene(), prompt(), example(), vocabulary, transcript, status,
+        return new View(card.scene(), card.roleplay(), prompt(), example(), vocabulary, transcript, status,
             voiceError, alert, phase == Phase.PASSED);
     }
 
@@ -261,6 +281,6 @@ final class PracticeSession {
         return Component.translatable("englishmc.status." + key, args);
     }
 
-    record View(Bilingual scene, Bilingual prompt, Bilingual example, boolean vocabulary,
+    record View(Bilingual scene, RoleplayDeck.Context roleplay, Bilingual prompt, Bilingual example, boolean vocabulary,
                 String transcript, Component status, String voiceError, boolean alert, boolean passed) {}
 }

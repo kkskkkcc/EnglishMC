@@ -25,7 +25,12 @@ public final class LessonDeck {
     }
 
     public record Card(String id, String topic, Bilingual scene, Bilingual prompt, Bilingual example,
-                       List<List<String>> cues, Bilingual vocabulary) {}
+                       List<List<String>> cues, Bilingual vocabulary, RoleplayDeck.Context roleplay) {
+        public Card(String id, String topic, Bilingual scene, Bilingual prompt, Bilingual example,
+                    List<List<String>> cues, Bilingual vocabulary) {
+            this(id, topic, scene, prompt, example, cues, vocabulary, null);
+        }
+    }
 
     private final List<Card> source;
     private final List<Card> remaining = new ArrayList<>();
@@ -43,13 +48,6 @@ public final class LessonDeck {
         return take(0);
     }
 
-    public Card followUp(Card previous) {
-        for (int index = 0; index < remaining.size(); index++) {
-            if (remaining.get(index).topic().equals(previous.topic())) return take(index);
-        }
-        return null;
-    }
-
     private Card take(int index) {
         Card next = remaining.remove(index);
         lastId = next.id();
@@ -60,6 +58,14 @@ public final class LessonDeck {
         if (!remaining.isEmpty()) return;
         remaining.addAll(source);
         Collections.shuffle(remaining);
+    }
+
+    static List<List<String>> cues(String field) {
+        List<List<String>> groups = new ArrayList<>();
+        for (String group : field.split(";")) {
+            groups.add(List.of(group.split(",")));
+        }
+        return List.copyOf(groups);
     }
 
     private static final class Library {
@@ -87,13 +93,10 @@ public final class LessonDeck {
                         }
                         PracticeLevel level = PracticeLevel.valueOf(fields[4]);
                         if (!ids.get(level).add(fields[0])) throw new IOException("Duplicate scene at row " + number);
-                        List<List<String>> cues = new ArrayList<>();
-                        for (String group : fields[9].split(";")) {
-                            cues.add(List.of(group.split(",")));
-                        }
+
                         byLevel.get(level).add(new Card(fields[0], fields[1], new Bilingual(fields[2], fields[3]),
                             new Bilingual(fields[5], fields[6]), new Bilingual(fields[7], fields[8]),
-                            List.copyOf(cues), new Bilingual(fields[10], fields[11])));
+                            cues(fields[9]), new Bilingual(fields[10], fields[11])));
                     }
                 }
             } catch (IOException error) {

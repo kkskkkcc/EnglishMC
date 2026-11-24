@@ -68,6 +68,8 @@ public final class PracticeChecks {
             "Incorrect vocabulary passed");
         System.out.println("EnglishMC verified all " + SCENE_COUNT * values.length + " lessons and reply checks");
 
+        RoleplayChecks.verify();
+
         if (args.length > 0) {
             var recognizer = new LocalRecognizer(Path.of("."));
             try (var sample = AudioSystem.getAudioInputStream(Path.of(args[0]).toFile())) {

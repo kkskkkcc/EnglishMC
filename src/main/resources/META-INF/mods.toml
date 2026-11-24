@@ -4,7 +4,7 @@ license="All Rights Reserved for original code and content; see third-party noti
 
 [[mods]]
 modId="englishmc"
-version="1.1.0"
+version="1.2.0"
 displayName="EnglishMC 英语口语"
 displayTest="IGNORE_ALL_VERSION"
 description='''Bilingual, offline English speaking practice for single-player worlds.'''

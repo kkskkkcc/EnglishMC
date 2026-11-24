@@ -81,9 +81,22 @@ final class PracticeHud {
 
     private static List<Line> lines(Font font, int width, PracticeSession.View view, Minecraft minecraft) {
         var output = new ArrayList<Line>();
-        String scene = minecraft.getLanguageManager().getSelected().startsWith("zh")
-            ? view.scene().chinese() : view.scene().english();
-        add(output, font, width, Component.literal(scene), 0xff9ee1fa, 0);
+        boolean chinese = minecraft.getLanguageManager().getSelected().startsWith("zh");
+        String scene = chinese ? view.scene().chinese() : view.scene().english();
+        var roleplay = view.roleplay();
+        Component title = roleplay == null || view.vocabulary() ? Component.literal(scene)
+            : Component.translatable("englishmc.roleplay.title", scene, roleplay.turn(), roleplay.total());
+        add(output, font, width, title, 0xff9ee1fa, 0);
+        if (roleplay != null && !view.vocabulary()) {
+            add(output, font, width, Component.translatable("englishmc.roleplay.roles",
+                chinese ? roleplay.playerRole().chinese() : roleplay.playerRole().english(),
+                chinese ? roleplay.partnerRole().chinese() : roleplay.partnerRole().english()), 0xffc2cbd4, 2);
+            if (roleplay.turn() == 1) {
+                add(output, font, width, Component.literal(chinese ? roleplay.situation().chinese()
+                    : roleplay.situation().english()), 0xffc2cbd4, 1);
+            }
+            add(output, font, width, Component.translatable(roleplay.task()), 0xffa7bed8, 2);
+        }
         for (var sentence : view.prompt().sentences()) {
             add(output, font, width, Component.literal(sentence.english()), 0xffffffff, 3);
             add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
@@ -96,8 +109,19 @@ final class PracticeHud {
             add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
             exampleKey = null;
         }
+        if (roleplay != null && roleplay.americanSlang() != null && !view.vocabulary()) {
+            var term = roleplay.americanSlang();
+            add(output, font, width, Component.translatable("englishmc.roleplay.slang", term.english(),
+                term.chinese()), 0xffd5b4ef, 3);
+        }
         if (!view.transcript().isEmpty()) {
             add(output, font, width, Component.translatable("englishmc.hud.heard", view.transcript()), 0xffa4e6ca, 3);
+        }
+        if (roleplay != null && view.passed() && !view.vocabulary() && roleplay.turn() == roleplay.total()) {
+            for (var sentence : roleplay.closing().sentences()) {
+                add(output, font, width, Component.literal(sentence.english()), 0xffffffff, 2);
+                add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
+            }
         }
         int statusColor = view.alert() ? 0xffffb8a7 : view.passed() ? 0xffadf0b9 : 0xffa7bed8;
         add(output, font, width, view.status(), statusColor, 4);
