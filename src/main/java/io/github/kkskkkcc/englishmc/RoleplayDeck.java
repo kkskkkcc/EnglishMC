@@ -134,8 +134,8 @@ public final class RoleplayDeck {
                 throw new IOException("Expected three turns and a unique roleplay ID for " + header[0]);
             }
             Bilingual slang = header[9].equals("-") ? null : pair(header, 9);
-            episodes.add(new Episode(header[0], pair(header, 1), pair(header, 3), pair(header, 5),
-                pair(header, 7), slang, pair(header, 11), List.copyOf(turns)));
+            episodes.add(new Episode(header[0], pair(header, 1), pair(header, 7), pair(header, 3),
+                pair(header, 5), slang, pair(header, 11), List.copyOf(turns)));
         }
 
         private static Bilingual pair(String[] fields, int offset) {

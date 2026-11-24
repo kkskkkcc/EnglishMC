@@ -6,12 +6,15 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 
 final class PracticeHud {
+    private static final int TRANSLATION_COLOR = 0xffe2e5e9;
+    private static final int COLUMN_GAP = 16;
     private static long chatUntil;
     private static PracticeSession.View lastView;
     private static List<Line> lastLines = List.of();
@@ -49,16 +52,18 @@ final class PracticeHud {
         }
 
         int space = right - left;
-        int panelWidth = Math.min(398, Math.max(175, Math.min(space, (int) (width * 0.82))));
+        int maxWidth = view.roleplay() == null ? 398 : 454;
+        int panelWidth = Math.min(maxWidth, Math.max(175, Math.min(space, (int) (width * 0.84))));
         Font font = minecraft.font;
         if (!view.equals(lastView) || lastWidth != panelWidth) {
             lastView = view;
             lastWidth = panelWidth;
             lastLines = lines(font, panelWidth - 20, view, minecraft);
         }
-        int panelHeight = 13 + lastLines.stream().mapToInt(line -> line.gap() + 10).sum();
+        int panelHeight = 6 + lastLines.stream().mapToInt(line -> line.gap() + 10).sum();
+        float verticalScale = Math.max(0.66f, (float) (bottom - height / 2 - 8) / panelHeight);
         float scale = Math.min(1f, Math.min((float) Math.max(40, space) / panelWidth,
-            (float) Math.max(42, bottom - 38) / panelHeight));
+            Math.min(verticalScale, (float) Math.max(42, bottom - 38) / panelHeight)));
         float scaledWidth = panelWidth * scale;
         float x = Math.max(left, Math.min((width - scaledWidth) / 2f, right - scaledWidth));
         float y = bottom - panelHeight * scale;
@@ -67,13 +72,17 @@ final class PracticeHud {
         pose.pushPose();
         pose.translate(x, y, 0);
         pose.scale(scale, scale, 1f);
-        graphics.fill(0, 0, panelWidth, panelHeight, 0xe51b2027);
-        graphics.fill(0, 0, panelWidth, 1, 0xff78c9e8);
-        int lineY = 7;
+        int lineY = 3;
+        int translationX = 10 + englishWidth(panelWidth - 20) + COLUMN_GAP;
         for (Line line : lastLines) {
             lineY += line.gap();
-            graphics.drawString(font, line.text(), (panelWidth - font.width(line.text())) / 2, lineY,
-                line.color(), false);
+            if (line.translation() == null) {
+                graphics.drawString(font, line.text(), (panelWidth - font.width(line.text())) / 2, lineY,
+                    line.color(), true);
+            } else {
+                graphics.drawString(font, line.text(), 10, lineY, line.color(), true);
+                graphics.drawString(font, line.translation(), translationX, lineY, TRANSLATION_COLOR, true);
+            }
             lineY += 10;
         }
         pose.popPose();
@@ -84,56 +93,83 @@ final class PracticeHud {
         boolean chinese = minecraft.getLanguageManager().getSelected().startsWith("zh");
         String scene = chinese ? view.scene().chinese() : view.scene().english();
         var roleplay = view.roleplay();
-        Component title = roleplay == null || view.vocabulary() ? Component.literal(scene)
-            : Component.translatable("englishmc.roleplay.title", scene, roleplay.turn(), roleplay.total());
-        add(output, font, width, title, 0xff9ee1fa, 0);
-        if (roleplay != null && !view.vocabulary()) {
-            add(output, font, width, Component.translatable("englishmc.roleplay.roles",
+        boolean inRole = roleplay != null && !view.vocabulary();
+        boolean columns = inRole && width >= 270;
+        boolean closing = inRole && view.passed() && roleplay.turn() == roleplay.total();
+        Component title = inRole
+            ? Component.translatable("englishmc.roleplay.title", scene, roleplay.turn(), roleplay.total())
+            : Component.literal(scene);
+        add(output, font, width, title, 0xffa5ebff, 0);
+        if (inRole) {
+            String roles = I18n.get("englishmc.roleplay.roles",
                 chinese ? roleplay.playerRole().chinese() : roleplay.playerRole().english(),
-                chinese ? roleplay.partnerRole().chinese() : roleplay.partnerRole().english()), 0xffc2cbd4, 2);
+                chinese ? roleplay.partnerRole().chinese() : roleplay.partnerRole().english());
+            add(output, font, width, Component.literal(roles), TRANSLATION_COLOR, 1);
             if (roleplay.turn() == 1) {
                 add(output, font, width, Component.literal(chinese ? roleplay.situation().chinese()
-                    : roleplay.situation().english()), 0xffc2cbd4, 1);
+                    : roleplay.situation().english()), TRANSLATION_COLOR, 0);
             }
-            add(output, font, width, Component.translatable(roleplay.task()), 0xffa7bed8, 2);
+            if (!closing) add(output, font, width, Component.translatable(roleplay.task()), 0xffc0d7f1, 1);
         }
         for (var sentence : view.prompt().sentences()) {
-            add(output, font, width, Component.literal(sentence.english()), 0xffffffff, 3);
-            add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
+            addPair(output, font, width, Component.literal(sentence.english()), sentence.chinese(),
+                0xffffffff, columns);
         }
-        String exampleKey = view.vocabulary() ? "englishmc.hud.word" : "englishmc.hud.example";
-        for (var sentence : view.example().sentences()) {
-            Component example = exampleKey == null ? Component.literal(sentence.english())
-                : Component.translatable(exampleKey, sentence.english());
-            add(output, font, width, example, 0xfff9db9c, 3);
-            add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
-            exampleKey = null;
-        }
-        if (roleplay != null && roleplay.americanSlang() != null && !view.vocabulary()) {
-            var term = roleplay.americanSlang();
-            add(output, font, width, Component.translatable("englishmc.roleplay.slang", term.english(),
-                term.chinese()), 0xffd5b4ef, 3);
-        }
-        if (!view.transcript().isEmpty()) {
-            add(output, font, width, Component.translatable("englishmc.hud.heard", view.transcript()), 0xffa4e6ca, 3);
-        }
-        if (roleplay != null && view.passed() && !view.vocabulary() && roleplay.turn() == roleplay.total()) {
-            for (var sentence : roleplay.closing().sentences()) {
-                add(output, font, width, Component.literal(sentence.english()), 0xffffffff, 2);
-                add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
+        if (!closing) {
+            String exampleKey = view.vocabulary() ? "englishmc.hud.word" : "englishmc.hud.example";
+            for (var sentence : view.example().sentences()) {
+                Component example = exampleKey == null ? Component.literal(sentence.english())
+                    : Component.translatable(exampleKey, sentence.english());
+                addPair(output, font, width, example, sentence.chinese(), 0xffffe0a2, columns);
+                exampleKey = null;
             }
         }
-        int statusColor = view.alert() ? 0xffffb8a7 : view.passed() ? 0xffadf0b9 : 0xffa7bed8;
-        add(output, font, width, view.status(), statusColor, 4);
+        if (inRole && !closing && roleplay.americanSlang() != null) {
+            var term = roleplay.americanSlang();
+            add(output, font, width, Component.translatable("englishmc.roleplay.slang", term.english(),
+                term.chinese()), 0xffe2c3ff, 2);
+        }
+        if (!view.transcript().isEmpty()) {
+            add(output, font, width, Component.translatable("englishmc.hud.heard", view.transcript()), 0xffb4f5d8, 3);
+        }
+        if (closing) {
+            for (var sentence : roleplay.closing().sentences()) {
+                addPair(output, font, width, Component.literal(sentence.english()), sentence.chinese(),
+                    0xffffffff, columns);
+            }
+        }
+        int statusColor = view.alert() ? 0xffffb8a7 : view.passed() ? 0xffadf0b9 : 0xffc0d7f1;
+        add(output, font, width, view.status(), statusColor, 3);
         if (view.voiceError() != null) {
             add(output, font, width, Component.translatable(view.voiceError()), 0xffffb8a7, 2);
         }
         return List.copyOf(output);
     }
 
+    private static void addPair(List<Line> output, Font font, int width, Component english, String chinese,
+                                int color, boolean columns) {
+        Component translation = Component.literal(chinese);
+        if (!columns) {
+            add(output, font, width, english, color, 3);
+            add(output, font, width, translation, TRANSLATION_COLOR, 0);
+            return;
+        }
+        int englishWidth = englishWidth(width);
+        var left = font.split(english, englishWidth);
+        var right = font.split(translation, width - englishWidth - COLUMN_GAP);
+        for (int index = 0; index < Math.max(left.size(), right.size()); index++) {
+            output.add(new Line(index < left.size() ? left.get(index) : FormattedCharSequence.EMPTY,
+                index < right.size() ? right.get(index) : FormattedCharSequence.EMPTY, color, index == 0 ? 2 : 0));
+        }
+    }
+
+    private static int englishWidth(int width) {
+        return (int) ((width - COLUMN_GAP) * 0.57);
+    }
+
     private static void add(List<Line> output, Font font, int width, Component text, int color, int gap) {
         for (FormattedCharSequence line : font.split(text, width)) {
-            output.add(new Line(line, color, gap));
+            output.add(new Line(line, null, color, gap));
             gap = 0;
         }
     }
@@ -156,5 +192,5 @@ final class PracticeHud {
         return width + 6;
     }
 
-    private record Line(FormattedCharSequence text, int color, int gap) {}
+    private record Line(FormattedCharSequence text, FormattedCharSequence translation, int color, int gap) {}
 }

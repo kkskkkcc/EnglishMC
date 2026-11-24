@@ -61,6 +61,11 @@ final class RoleplayChecks {
                     totalTurns++;
                 }
             }
+            var coffee = scenes.get("20-coffee").get(0).roleplay();
+            require(coffee.playerRole().english().startsWith("customer")
+                && coffee.partnerRole().english().startsWith("barista")
+                && coffee.situation().english().startsWith("You are ordering"),
+                "Setting, player role and partner role must occupy independent fields");
             require(seenTopics.equals(topics), "Missing requested topic at " + level);
             require(rolePairs.size() == EPISODES && slangNotes == 68, "Role pairs or slang tags are missing");
             require(!deck.draw().get(0).topic().equals(lastScene), "Repeated across shuffled cycle");
