@@ -13,7 +13,16 @@ import java.util.Map;
 import java.util.Set;
 
 public final class LessonDeck {
-    public record Bilingual(String english, String chinese) {}
+    public record Bilingual(String english, String chinese) {
+        public List<Bilingual> sentences() {
+            String[] en = english.split("(?<=[.!?])\\s+");
+            String[] zh = chinese.split("(?<=[。？！?!])\\s*");
+            if (en.length != zh.length || en.length == 1) return List.of(this);
+            var pairs = new ArrayList<Bilingual>(en.length);
+            for (int i = 0; i < en.length; i++) pairs.add(new Bilingual(en[i].strip(), zh[i].strip()));
+            return List.copyOf(pairs);
+        }
+    }
 
     public record Card(String id, String topic, Bilingual scene, Bilingual prompt, Bilingual example,
                        List<List<String>> cues, Bilingual vocabulary) {}

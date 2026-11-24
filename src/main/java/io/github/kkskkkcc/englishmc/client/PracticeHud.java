@@ -1,5 +1,6 @@
 package io.github.kkskkkcc.englishmc.client;
 
+import io.github.kkskkkcc.englishmc.mixin.GuiTooltipAccessor;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -29,7 +30,17 @@ final class PracticeHud {
         if (view == null) return;
         int right = width - 10 - sidebarWidth(minecraft);
         int left = 10;
-        int bottom = height - Math.max(65, Math.max(gui.leftHeight, gui.rightHeight) + 27);
+        int stackHeight = Math.max(gui.leftHeight, gui.rightHeight);
+        // Forge reserves an armor row even when the armor bar is empty.
+        int leftStack = gui.leftHeight;
+        if (minecraft.gameMode.canHurtPlayer() && minecraft.player.getArmorValue() == 0) leftStack -= 10;
+        int clearance = Math.max(35, Math.max(leftStack, gui.rightHeight) - 5);
+        if (((GuiTooltipAccessor) gui).englishmc$itemNameTicks() > 0
+            && !minecraft.player.getMainHandItem().isEmpty()) {
+            int itemNameY = Math.max(59, stackHeight) - (minecraft.gameMode.canHurtPlayer() ? 0 : 14);
+            clearance = Math.max(clearance, itemNameY + 6);
+        }
+        int bottom = height - clearance;
         if (System.nanoTime() < chatUntil
             && minecraft.options.chatVisibility().get() != net.minecraft.world.entity.player.ChatVisiblity.HIDDEN) {
             int chatRight = gui.getChat().getWidth() + 10;
@@ -73,12 +84,18 @@ final class PracticeHud {
         String scene = minecraft.getLanguageManager().getSelected().startsWith("zh")
             ? view.scene().chinese() : view.scene().english();
         add(output, font, width, Component.literal(scene), 0xff9ee1fa, 0);
-        add(output, font, width, Component.literal(view.prompt().english()), 0xffffffff, 3);
-        add(output, font, width, Component.literal(view.prompt().chinese()), 0xffc2cbd4, 0);
-        Component example = Component.translatable(view.vocabulary() ? "englishmc.hud.word" : "englishmc.hud.example",
-            view.example().english());
-        add(output, font, width, example, 0xfff9db9c, 3);
-        add(output, font, width, Component.literal(view.example().chinese()), 0xffc2cbd4, 0);
+        for (var sentence : view.prompt().sentences()) {
+            add(output, font, width, Component.literal(sentence.english()), 0xffffffff, 3);
+            add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
+        }
+        String exampleKey = view.vocabulary() ? "englishmc.hud.word" : "englishmc.hud.example";
+        for (var sentence : view.example().sentences()) {
+            Component example = exampleKey == null ? Component.literal(sentence.english())
+                : Component.translatable(exampleKey, sentence.english());
+            add(output, font, width, example, 0xfff9db9c, 3);
+            add(output, font, width, Component.literal(sentence.chinese()), 0xffc2cbd4, 0);
+            exampleKey = null;
+        }
         if (!view.transcript().isEmpty()) {
             add(output, font, width, Component.translatable("englishmc.hud.heard", view.transcript()), 0xffa4e6ca, 3);
         }

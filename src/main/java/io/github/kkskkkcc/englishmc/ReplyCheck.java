@@ -33,9 +33,23 @@ public final class ReplyCheck {
     private static final Set<String> FILLERS = Set.of("uh", "um", "er", "hmm", "ah");
     private static final Set<String> DEVELOPMENT = Set.of("because", "since", "although", "though", "while",
         "when", "if", "unless", "so", "which", "but", "however", "therefore", "instead", "example",
-        "especially", "despite", "otherwise", "rather", "whereas", "even", "reason", "first", "then");
+        "especially", "despite", "otherwise", "rather", "whereas", "even", "reason", "first", "then", "also");
 
     private static final Set<String> SUBJECTS = Set.of("i", "we", "you", "they", "he", "she", "it", "there");
+    private static final Set<String> ADVERBS = Set.of("usually", "often", "always", "sometimes", "rarely",
+        "normally", "just", "still", "also", "really", "already", "probably", "generally", "never", "first");
+    private static final Set<String> VERBS = Set.of(
+        "am", "is", "are", "was", "were", "can", "could", "will", "would", "should", "may", "might",
+        "do", "does", "did", "have", "has", "had", "need", "needs", "want", "wants", "go", "goes", "went",
+        "get", "gets", "got", "like", "likes", "liked", "love", "loves", "make", "makes", "made", "eat",
+        "eats", "ate", "take", "takes", "took", "buy", "bought", "meet", "met", "see", "saw", "use", "used",
+        "call", "called", "text", "send", "sent", "live", "lives", "work", "works", "study", "studies",
+        "look", "looks", "check", "checked", "ask", "asked", "think", "thinks", "thought", "know", "knows",
+        "feel", "felt", "prefer", "try", "tried", "start", "started", "plan", "planned", "pay", "paid",
+        "put", "find", "found", "say", "said", "leave", "left", "bring", "brought", "read", "write",
+        "walk", "walked", "run", "ran", "play", "watch", "choose", "keep", "help", "sleep", "drink", "cook");
+    private static final Set<String> SHORT_REPLY_OPENERS = Set.of("at", "by", "in", "on", "near", "next",
+        "outside", "inside", "yes", "no", "sure", "one", "two", "three", "a", "some", "the");
     private static final Set<String> RESPONSE_OPENERS = Set.of("go", "take", "turn", "stay", "start", "put",
         "look", "head", "walk", "keep", "make", "try", "come", "read", "leave", "please", "thanks");
 
@@ -52,17 +66,12 @@ public final class ReplyCheck {
         if (vocabulary) return new Result(Outcome.RETRY, alignment.focus);
         boolean closeToExample = alignment.matched >= Math.max(3, (expected.size() * 3 + 3) / 4);
 
-        int minimumWords = switch (level) {
-            case B1 -> 5;
-            case B2 -> 8;
-            case IELTS7 -> 13;
-        };
+        int minimumWords = level.minimumWords();
         String phrase = phrase(actual);
         boolean relevant = card.cues().stream().allMatch(group -> group.stream()
             .anyMatch(cue -> phrase.contains(phrase(words(cue)))));
-        boolean developed = level != PracticeLevel.IELTS7 || actual.stream().anyMatch(DEVELOPMENT::contains);
-        boolean isResponse = actual.stream().anyMatch(SUBJECTS::contains)
-            || RESPONSE_OPENERS.contains(actual.get(0)) || actual.contains("please");
+        boolean developed = !level.extendedReply() || actual.stream().anyMatch(DEVELOPMENT::contains);
+        boolean isResponse = hasResponseStructure(level, actual);
         // A near match can be an intentional substitution, such as tea for coffee.
         // Require an added topic cue in that case rather than accepting a garbled read-aloud.
         String newWords = phrase(alignment.added);
@@ -73,6 +82,22 @@ public final class ReplyCheck {
             return new Result(Outcome.PERSONAL_ANSWER, "");
         }
         return new Result(Outcome.RETRY, closeToExample ? alignment.focus : "");
+    }
+
+    private static boolean hasResponseStructure(PracticeLevel level, List<String> actual) {
+        String first = actual.get(0);
+        if (level == PracticeLevel.A1 && actual.size() <= 3) return true;
+        if (!level.extendedReply() && actual.size() <= 8 && SHORT_REPLY_OPENERS.contains(first)) return true;
+        if (RESPONSE_OPENERS.contains(first) || first.equals("please") || actual.get(actual.size() - 1).equals("please")) {
+            return true;
+        }
+        for (int i = 0; i + 1 < actual.size(); i++) {
+            String word = actual.get(i);
+            int next = SUBJECTS.contains(word) ? i + 1 : word.equals("my") ? i + 2 : actual.size();
+            while (next < actual.size() && ADVERBS.contains(actual.get(next))) next++;
+            if (next < actual.size() && VERBS.contains(actual.get(next))) return true;
+        }
+        return false;
     }
 
     private static String phrase(List<String> tokens) {

@@ -17,6 +17,7 @@ import javax.sound.sampled.LineUnavailableException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundSource;
 
 final class PracticeSession {
     private enum Phase { IDLE, WAITING, PREPARING, RECORDING, CHECKING, PASSED }
@@ -29,7 +30,7 @@ final class PracticeSession {
     private static final Bilingual PERSONAL_MATCHED = new Bilingual("Good, you addressed the topic.", "很好，你回应了这个话题。");
 
     private final Minecraft minecraft;
-    private final LocalVoice voice = new LocalVoice();
+    private final LocalVoice voice;
     private final LocalRecognizer recognizer;
     private final ExecutorService speech = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "EnglishMC microphone and recognition");
@@ -58,6 +59,7 @@ final class PracticeSession {
     PracticeSession(Minecraft minecraft) {
         this.minecraft = minecraft;
         recognizer = new LocalRecognizer(minecraft.gameDirectory.toPath());
+        voice = new LocalVoice(minecraft.gameDirectory.toPath());
     }
 
     void tick(boolean recordPressed, boolean replayPressed) {
@@ -197,7 +199,11 @@ final class PracticeSession {
         if (unavailable) return;
         voiceError = null;
         int version = turnVersion;
-        voice.speak(lines, key -> minecraft.execute(() -> {
+        int volume = Math.round(100 * minecraft.options.getSoundSourceVolume(SoundSource.MASTER)
+            * minecraft.options.getSoundSourceVolume(SoundSource.VOICE));
+        var narration = new LocalVoice.Narration(lines.stream().flatMap(line -> line.sentences().stream()).toList(),
+            difficulty.narrationRate(), volume);
+        voice.speak(narration, key -> minecraft.execute(() -> {
             if (turnVersion == version) voiceError = key;
         }));
     }

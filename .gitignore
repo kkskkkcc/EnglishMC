@@ -3,7 +3,6 @@
 /build/
 /run/
 /out/
-/third_party/*.zip
-/third_party/*.jar
+/third_party/
 *.iml
 hs_err_pid*.log

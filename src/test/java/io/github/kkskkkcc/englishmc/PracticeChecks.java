@@ -12,8 +12,17 @@ public final class PracticeChecks {
     private static final int SCENE_COUNT = 60;
 
     public static void main(String[] args) throws Exception {
+        require(PracticeLevel.fromRule(1) == PracticeLevel.B1
+            && PracticeLevel.fromRule(2) == PracticeLevel.B2
+            && PracticeLevel.fromRule(3) == PracticeLevel.IELTS_6_7, "Existing world mappings changed");
+        var values = PracticeLevel.values();
+        require(values.length == 7, "Missing difficulty choices");
+        for (PracticeLevel level : values) {
+            require(PracticeLevel.fromRule(level.ruleValue()) == level, "Difficulty value collision");
+        }
         Map<String, Card> previous = null;
         Card morning = null;
+        Card urgent = null;
         for (PracticeLevel level : PracticeLevel.values()) {
             var deck = new LessonDeck(level);
             var cards = new HashMap<String, Card>();
@@ -25,7 +34,7 @@ public final class PracticeChecks {
                     "Example did not pass: " + level + "/" + card.id());
                 require(ReplyCheck.check(level, card, true, card.vocabulary().english()).outcome() == Outcome.MATCHED,
                     "Vocabulary did not pass: " + level + "/" + card.id());
-                require(!ReplyCheck.check(level, card, false, "The banana moon danced a happy banana dance today.").passed(),
+                require(!ReplyCheck.check(level, card, false, "Purple obelisks orbit distant galaxies.").passed(),
                     "Unrelated reply passed: " + level + "/" + card.id());
                 require(ReplyCheck.check(level, card, false, "").outcome() == Outcome.NO_SPEECH, "Silence passed");
                 if (previous != null) {
@@ -37,17 +46,27 @@ public final class PracticeChecks {
                 last = card;
             }
             require(!deck.draw().id().equals(last.id()), "Immediate repeat across deck cycles");
-            if (level == PracticeLevel.B1) morning = cards.get("morning");
+            if (level == PracticeLevel.B1) {
+                morning = cards.get("morning");
+                urgent = cards.get("urgent");
+            }
             previous = cards;
         }
-        require(morning != null, "Missing morning scene");
+        require(morning != null && urgent != null, "Missing regression scenes");
+        require(urgent.prompt().sentences().size() == 1, "Expected the single location question");
+        require(!ReplyCheck.check(PracticeLevel.B1, urgent, false, "i and the for ah answer on foot the library").passed(),
+            "Incomplete sentence from live game was incorrectly accepted");
+        require(ReplyCheck.check(PracticeLevel.B1, urgent, false, "I am waiting outside the library").outcome()
+            == Outcome.PERSONAL_ANSWER, "A valid response to the location question was rejected");
         require(ReplyCheck.check(PracticeLevel.B1, morning, false, "I have breakfast and get dressed first").outcome()
             == Outcome.PERSONAL_ANSWER, "Valid personal answer was rejected");
         var retry = ReplyCheck.check(PracticeLevel.B1, morning, false, "I usually make foggy before I check my phone");
         require(retry.outcome() == Outcome.RETRY && retry.practiceWords().contains("coffee"), "Missing correction");
+        require(ReplyCheck.check(PracticeLevel.B1, morning, false, "I usually make tea before I check my phone").outcome()
+            == Outcome.PERSONAL_ANSWER, "Valid word substitution was rejected");
         require(ReplyCheck.check(PracticeLevel.B1, morning, true, "banana").outcome() == Outcome.RETRY,
             "Incorrect vocabulary passed");
-        System.out.println("EnglishMC verified all " + SCENE_COUNT * 3 + " lessons and reply checks");
+        System.out.println("EnglishMC verified all " + SCENE_COUNT * values.length + " lessons and reply checks");
 
         if (args.length > 0) {
             var recognizer = new LocalRecognizer(Path.of("."));

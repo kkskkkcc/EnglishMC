@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.github.kkskkkcc'
-version = '1.0.0'
+version = '1.1.0'
 base.archivesName = 'englishmc-forge-1.20.1'
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -59,4 +59,12 @@ tasks.named('check').configure { dependsOn 'verifyPractice' }
 
 tasks.named('processResources').configure {
     from('THIRD_PARTY_NOTICES.md') { into 'META-INF' }
+}
+
+tasks.register('verifyNeuralVoice', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.kkskkkcc.englishmc.client.speech.NeuralVoiceCheck'
+    args layout.buildDirectory.file('validation/englishmc-kokoro-preview.wav').get().asFile.absolutePath
+    onlyIf { System.getProperty('os.name').startsWith('Windows') }
 }
